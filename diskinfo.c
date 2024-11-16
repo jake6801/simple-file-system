@@ -38,13 +38,13 @@ struct __attribute__((__packed__)) dir_entry_t {
     __uint8_t unused[6];
 };
 
-int main() {    
-    struct superblock_t superblock = {0};
-    int fd = open("test.img", O_RDONLY);
-    read(fd, &superblock, sizeof(superblock));
-    close(fd);
+int main(int argc, char *argv[]) {    
+    // read first 30 bytes into superblock struct
+    struct superblock_t superblock = {0}; //TODO dynamically allocate memory for this?
+    int file_descriptor = open(argv[1], O_RDONLY); //? why do i need this O_RDONLY
+    read(file_descriptor, &superblock, sizeof(superblock));    
 
-    // Convert fields to host endianness
+    // convert all ints into big endian
     superblock.block_size = ntohs(superblock.block_size);
     superblock.file_system_block_count = ntohl(superblock.file_system_block_count);
     superblock.fat_start_block = ntohl(superblock.fat_start_block);
@@ -52,10 +52,44 @@ int main() {
     superblock.root_dir_start_block = ntohl(superblock.root_dir_start_block);
     superblock.root_dir_block_count = ntohl(superblock.root_dir_block_count);
 
+    // print superblock information 
     printf("Super block information:\n");
-    printf("Block size: %d\nBlock count: %d\nFAT starts: %d\nFAT blocks: %d\nRoot directory start: %d\nRoot directory blocks: %d\n", superblock.block_size, superblock.file_system_block_count, superblock.fat_start_block, superblock.fat_block_count, superblock.root_dir_start_block, superblock.root_dir_block_count);
+    printf("Block size: %d\nBlock count: %d\nFAT starts: %d\nFAT blocks: %d\nRoot directory start: %d\nRoot directory blocks: %d\n\n", superblock.block_size, superblock.file_system_block_count, superblock.fat_start_block, superblock.fat_block_count, superblock.root_dir_start_block, superblock.root_dir_block_count);
 
-
-
+    // dynamically allocate memory for FAT 
+    int fat_size = superblock.block_size * superblock.fat_block_count;
+    __uint32_t *FAT = malloc(fat_size); 
+    
+    // skip ahead to where FAT starts 
+    lseek(file_descriptor, superblock.fat_start_block * superblock.block_size, SEEK_SET); // lseek skips ahead in the file using the offset of superblock.fat_start_block * superblock.block_size from the start of the file using SEEK_SET  
+    
+    // read FAT from the file into the dynamically allocated FAT memory
+    read(file_descriptor, FAT, fat_size); 
+    
+    // calculate the FAT information
+    int free_blocks = 0, reserved_blocks = 0, allocated_blocks = 0;
+    int fat_entries = fat_size / 4; 
+    for(int i = 0; i < fat_entries; i++) {
+        __uint32_t fat_entry = ntohl(FAT[i]);
+        if (fat_entry == 0x00000000) { // 0x00000000 = block is available
+            free_blocks++;
+        } 
+        else if (fat_entry == 0x00000001) { // 0x00000001 = block is reserved
+            reserved_blocks++;
+        }
+        else { // 0x00000002 - 0xFFFFFF00 means allocated blocks as part of files and 0xFFFFFFFF means its the last block in a file so count both as allocated 
+            allocated_blocks++;
+        }
+        //? do i need something for recognizing the last block in a file? (when fat_entry == 0xFFFFFFFF)?
+    }
+    
+    // free dynamically allocated memory for FAT and close the file 
+    free(FAT);
+    close(file_descriptor);
+    
+    // print FAT information
+    printf("FAT information:\n");
+    printf("Free Blocks: %d\nReserved Blocks: %d\nAllocated Blocks: %d\n", free_blocks, reserved_blocks, allocated_blocks);
+    
     return 0;
 }
