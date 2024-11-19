@@ -1,4 +1,9 @@
 #include <stdio.h>
+#include <stdint.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <time.h>
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
@@ -39,32 +44,44 @@ struct __attribute__((__packed__)) dir_entry_t {
 };
 
 int main(int argc, char *argv[]) {    
-    // read first 30 bytes into superblock struct
-    struct superblock_t superblock = {0}; //TODO dynamically allocate memory for this?
-    int file_descriptor = open(argv[1], O_RDONLY); //? why do i need this O_RDONLY
-    read(file_descriptor, &superblock, sizeof(superblock));    
+    // read first 30 bytes into superblock struct    
+    int fd = open(argv[1], O_RDWR); 
+    struct stat buffer;
+    int status = fstat(fd, &buffer);
+    void* address = mmap(NULL, buffer.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    struct superblock_t* superblock;
+    superblock = (struct superblock_t*)address;     
+
+    int fssize;
+    memcpy(&fssize, address+10, 4);
+    fssize = ntohl(fssize);
+
+    //! this is how I was doing it before, now doing it the way TA said to do it in example code 
+    // struct superblock_t superblock = {0}; //TODO dynamically allocate memory for this?
+    // int fd = open(argv[1], O_RDWR); 
+    // read(fd, &superblock, sizeof(superblock));    
 
     // convert all ints into big endian
-    superblock.block_size = ntohs(superblock.block_size);
-    superblock.file_system_block_count = ntohl(superblock.file_system_block_count);
-    superblock.fat_start_block = ntohl(superblock.fat_start_block);
-    superblock.fat_block_count = ntohl(superblock.fat_block_count);
-    superblock.root_dir_start_block = ntohl(superblock.root_dir_start_block);
-    superblock.root_dir_block_count = ntohl(superblock.root_dir_block_count);
+    superblock->block_size = ntohs(superblock->block_size);
+    superblock->file_system_block_count = ntohl(superblock->file_system_block_count);
+    superblock->fat_start_block = ntohl(superblock->fat_start_block);
+    superblock->fat_block_count = ntohl(superblock->fat_block_count);
+    superblock->root_dir_start_block = ntohl(superblock->root_dir_start_block);
+    superblock->root_dir_block_count = ntohl(superblock->root_dir_block_count);
 
     // print superblock information 
     printf("Super block information:\n");
-    printf("Block size: %d\nBlock count: %d\nFAT starts: %d\nFAT blocks: %d\nRoot directory start: %d\nRoot directory blocks: %d\n\n", superblock.block_size, superblock.file_system_block_count, superblock.fat_start_block, superblock.fat_block_count, superblock.root_dir_start_block, superblock.root_dir_block_count);
+    printf("Block size: %d\nBlock count: %d\nFAT starts: %d\nFAT blocks: %d\nRoot directory start: %d\nRoot directory blocks: %d\n\n", superblock->block_size, superblock->file_system_block_count, superblock->fat_start_block, superblock->fat_block_count, superblock->root_dir_start_block, superblock->root_dir_block_count);
 
     // dynamically allocate memory for FAT 
-    int fat_size = superblock.block_size * superblock.fat_block_count;
+    int fat_size = superblock->block_size * superblock->fat_block_count;
     __uint32_t *FAT = malloc(fat_size); 
     
     // skip ahead to where FAT starts 
-    lseek(file_descriptor, superblock.fat_start_block * superblock.block_size, SEEK_SET); // lseek skips ahead in the file using the offset of superblock.fat_start_block * superblock.block_size from the start of the file using SEEK_SET  
+    lseek(fd, superblock->fat_start_block * superblock->block_size, SEEK_SET); // lseek skips ahead in the file using the offset of superblock.fat_start_block * superblock.block_size from the start of the file using SEEK_SET  
     
     // read FAT from the file into the dynamically allocated FAT memory
-    read(file_descriptor, FAT, fat_size); 
+    read(fd, FAT, fat_size); 
     
     // calculate the FAT information
     int free_blocks = 0, reserved_blocks = 0, allocated_blocks = 0;
@@ -85,7 +102,7 @@ int main(int argc, char *argv[]) {
     
     // free dynamically allocated memory for FAT and close the file 
     free(FAT);
-    close(file_descriptor);
+    close(fd);
     
     // print FAT information
     printf("FAT information:\n");
