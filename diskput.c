@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
     // map filesystem to memory
     int fs_fd = open(fs_file_name, O_RDWR);
     struct stat fs_buffer;
-    int status = fstat(fs_fd, &fs_buffer);
+    int fs_status = fstat(fs_fd, &fs_buffer);
     void* fs_address = mmap(NULL, fs_buffer.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fs_fd, 0);
 
     // check if file exists in current linux directory 
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     }
 
     struct stat put_file_buffer;
-    int status = fstat(put_fd, &put_file_buffer);
+    int put_file_status = fstat(put_fd, &put_file_buffer);
     void* put_file_address = mmap(NULL, put_file_buffer.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, put_fd, 0);
 
     struct superblock_t *superblock = (struct superblock_t *)fs_address;
@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
 
     int first_free_block = 0;
     int free_block_count = 0;
-    for (int i = 0; i < superblock->file_system_block_count; i++) {
+    for (int i = 0; i < superblock->file_system_block_count; i++) { //! shouldnt this be i < fat_size?
         if (fat_table[i] == 0x00000000) {
             if (free_block_count == 0) {
                 first_free_block = i;
@@ -129,8 +129,40 @@ int main(int argc, char *argv[]) {
         remaining_bytes -= bytes_to_write;
     }
 
+
+    void* root_dir_address = (uint8_t*)fs_address + superblock->root_dir_start_block * superblock->block_size;
+    struct dir_entry_t* dir_entry = (struct dir_entry_t*)root_dir_address;
+    int dir_entry_found = 0;
+
+    for (int i = 0; i < superblock->root_dir_block_count * superblock->block_size / sizeof(struct dir_entry_t); i++) {
+        if (dir_entry[i].status == 0x00) {
+            dir_entry_found = 1;
+            dir_entry[i].status = 0x03;
+            dir_entry[i].starting_block = htonl(first_free_block);
+            dir_entry[i].block_count = htonl(num_blocks_needed);
+            dir_entry[i].size = htonl(put_file_buffer.st_size);
+            
+            //TODO fix this to be actual time stamps 
+            struct dir_entry_timedate_t now = {2024, 11, 19, 12, 0, 1};
+            dir_entry[i].create_time = now;
+            dir_entry[i].modify_time = now;
+
+            strncpy((char*)dir_entry[i].filename, put_file_name, 31);
+            dir_entry[i].filename[30] = '\0';
+            break;
+        }
+    }
+
+    if (!dir_entry_found) {
+        printf("Root directory is full. Cannot create a new file entry.\n");
+        return -1;
+    }
+
+    msync(fs_address, fs_buffer.st_size, MS_SYNC);
     munmap(put_file_address, put_file_buffer.st_size);
     close(put_fd);
+    munmap(fs_address, fs_buffer.st_size);
+    close(fs_fd);
 
 
 

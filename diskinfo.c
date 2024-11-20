@@ -71,7 +71,6 @@ int main(int argc, char *argv[]) {
 
     // print superblock information 
     printf("Super block information:\n");
-    printf("fsid: %d\n", superblock->fs_id);
     printf("Block size: %d\nBlock count: %d\nFAT starts: %d\nFAT blocks: %d\nRoot directory start: %d\nRoot directory blocks: %d\n\n", superblock->block_size, superblock->file_system_block_count, superblock->fat_start_block, superblock->fat_block_count, superblock->root_dir_start_block, superblock->root_dir_block_count);
 
     // dynamically allocate memory for FAT 

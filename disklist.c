@@ -45,25 +45,25 @@ void print_directory_info(int file_descriptor, struct superblock_t superblock, i
     read(file_descriptor, directory, directory_size);
     int num_entries = directory_size / sizeof(struct dir_entry_t);
     for (int i = 0; i < num_entries; i++) {
-        struct dir_entry_t directory_entry = directory[i];
-        printf("status: 0x%02X\nfilename: %s\n", directory_entry.status, directory_entry.filename);
-        if (directory_entry.status == 0x00) {
+        struct dir_entry_t *directory_entry = &directory[i];
+        // printf("status: 0x%02X\nfilename: %s\n", directory_entry.status, directory_entry.filename);
+        if (directory_entry->status == 0x00) {
             continue;
         } // File type
         char type;
-        if (directory_entry.status == 0x03) {
+        if (directory_entry->status == 0x03) {
             type = 'F'; // Regular file
-        } else if (directory_entry.status == 0x05) {
+        } else if (directory_entry->status == 0x05) {
             type = 'D'; // Directory
         } else {
             type = '?'; // Unknown
         }
 
         // File size (host-endian)
-        int file_size = ntohl(directory_entry.size);
+        int file_size = ntohl(directory_entry->size);
 
         // Print entry details
-        printf("%c %10d %-30s ", type, file_size, directory_entry.filename);
+        printf("%c %10d %-30s ", type, file_size, directory_entry->filename);
         printf("\n");
     }
 
