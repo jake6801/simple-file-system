@@ -55,8 +55,11 @@ void print_directory_info(int file_descriptor, struct superblock_t superblock, i
             type = 'F'; // Regular file
         } else if (directory_entry->status == 0x05) {
             type = 'D'; // Directory
+            continue;
         } else {
             type = '?'; // Unknown
+            printf("Uknown file type\n");
+            continue;
         }
 
         // File size (host-endian)
@@ -66,9 +69,7 @@ void print_directory_info(int file_descriptor, struct superblock_t superblock, i
         printf("%c %10d %30s ", type, file_size, directory_entry->filename);
         printf("%d/%d/%d %.2d:%.2d:%.2d", directory_entry->modify_time.year, directory_entry->modify_time.month, directory_entry->modify_time.day, directory_entry->modify_time.hour, directory_entry->modify_time.minute, directory_entry->modify_time.second);
         printf("\n");
-
     }
-
     free(directory);
 }
 

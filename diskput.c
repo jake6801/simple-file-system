@@ -133,6 +133,7 @@ int main(int argc, char *argv[]) {
     void* root_dir_address = (uint8_t*)fs_address + superblock->root_dir_start_block * superblock->block_size;
     struct dir_entry_t* dir_entry = (struct dir_entry_t*)root_dir_address;
     int dir_entry_found = 0;
+    
 
     for (int i = 0; i < superblock->root_dir_block_count * superblock->block_size / sizeof(struct dir_entry_t); i++) {
         if (dir_entry[i].status == 0x00) {
@@ -147,8 +148,11 @@ int main(int argc, char *argv[]) {
             dir_entry[i].create_time = now;
             dir_entry[i].modify_time = now;
 
+
             strncpy((char*)dir_entry[i].filename, put_file_name, 31);
             dir_entry[i].filename[30] = '\0';
+
+            memset(dir_entry[i].unused, 0xFF, sizeof(dir_entry[i].unused));
             break;
         }
     }
