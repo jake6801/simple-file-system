@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     int fd = open(argv[1], O_RDWR); 
     struct stat buffer;
     int status = fstat(fd, &buffer);
-    void* address = mmap(NULL, buffer.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    void* address = mmap(NULL, buffer.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
     struct superblock_t* superblock;
     superblock = (struct superblock_t*)address;     
 

@@ -46,7 +46,7 @@ void print_directory_info(int file_descriptor, struct superblock_t superblock, i
     int num_entries = directory_size / sizeof(struct dir_entry_t);
     for (int i = 0; i < num_entries; i++) {
         struct dir_entry_t *directory_entry = &directory[i];
-        // printf("status: 0x%02X\nfilename: %s\n", directory_entry.status, directory_entry.filename);
+        // printf("status: 0x%02X\nfilename: %s\n", directory_entry->status, directory_entry->filename);
         if (directory_entry->status == 0x00) {
             continue;
         } // File type
@@ -63,8 +63,10 @@ void print_directory_info(int file_descriptor, struct superblock_t superblock, i
         int file_size = ntohl(directory_entry->size);
 
         // Print entry details
-        printf("%c %10d %-30s ", type, file_size, directory_entry->filename);
+        printf("%c %10d %30s ", type, file_size, directory_entry->filename);
+        printf("%d/%d/%d %.2d:%.2d:%.2d", directory_entry->modify_time.year, directory_entry->modify_time.month, directory_entry->modify_time.day, directory_entry->modify_time.hour, directory_entry->modify_time.minute, directory_entry->modify_time.second);
         printf("\n");
+
     }
 
     free(directory);
@@ -76,13 +78,14 @@ int main(int argc, char *argv[]) {
     int file_descriptor = open(argv[1], O_RDONLY); //? why do i need this O_RDONLY
     read(file_descriptor, &superblock, sizeof(superblock));    
 
-    // convert all ints into big endian
+    // convert all ints into big endian 
     superblock.block_size = ntohs(superblock.block_size);
     superblock.file_system_block_count = ntohl(superblock.file_system_block_count);
     superblock.fat_start_block = ntohl(superblock.fat_start_block);
     superblock.fat_block_count = ntohl(superblock.fat_block_count);
     superblock.root_dir_start_block = ntohl(superblock.root_dir_start_block);
     superblock.root_dir_block_count = ntohl(superblock.root_dir_block_count);
+
     // printf("Super block information:\n");
     // printf("Block size: %d\nBlock count: %d\nFAT starts: %d\nFAT blocks: %d\nRoot directory start: %d\nRoot directory blocks: %d\n\n", superblock.block_size, superblock.file_system_block_count, superblock.fat_start_block, superblock.fat_block_count, superblock.root_dir_start_block, superblock.root_dir_block_count);
 

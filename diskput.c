@@ -50,8 +50,6 @@ int main(int argc, char *argv[]) {
     char *put_file_name = argv[2];
     char *put_location = argv[3];
 
-
-
     // map filesystem to memory
     int fs_fd = open(fs_file_name, O_RDWR);
     struct stat fs_buffer;
@@ -67,8 +65,9 @@ int main(int argc, char *argv[]) {
 
     struct stat put_file_buffer;
     int put_file_status = fstat(put_fd, &put_file_buffer);
-    void* put_file_address = mmap(NULL, put_file_buffer.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, put_fd, 0);
+    void* put_file_address = mmap(NULL, put_file_buffer.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, put_fd, 0);
 
+    //! this is getting written into the file so Ill have to change it back when im done 
     struct superblock_t *superblock = (struct superblock_t *)fs_address;
     superblock->block_size = ntohs(superblock->block_size);
     superblock->file_system_block_count = ntohl(superblock->file_system_block_count);
@@ -90,7 +89,8 @@ int main(int argc, char *argv[]) {
 
     int first_free_block = 0;
     int free_block_count = 0;
-    for (int i = 0; i < superblock->file_system_block_count; i++) { //! shouldnt this be i < fat_size?
+    // for (int i = 0; i < superblock->file_system_block_count; i++) { //! shouldnt this be i < fat_size?
+    for (int i = 0; i < fat_size / sizeof(uint32_t); i++) {
         if (fat_table[i] == 0x00000000) {
             if (free_block_count == 0) {
                 first_free_block = i;
@@ -158,7 +158,15 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    msync(fs_address, fs_buffer.st_size, MS_SYNC);
+    // restore original endianness in the file 
+    superblock->block_size = htons(superblock->block_size);
+    superblock->file_system_block_count = htonl(superblock->file_system_block_count);
+    superblock->fat_start_block = htonl(superblock->fat_start_block);
+    superblock->fat_block_count = htonl(superblock->fat_block_count);
+    superblock->root_dir_start_block = htonl(superblock->root_dir_start_block);
+    superblock->root_dir_block_count = htonl(superblock->root_dir_block_count);
+
+    msync(fs_address, fs_buffer.st_size, MS_SYNC); //? whats this doing
     munmap(put_file_address, put_file_buffer.st_size);
     close(put_fd);
     munmap(fs_address, fs_buffer.st_size);
@@ -175,7 +183,7 @@ int main(int argc, char *argv[]) {
 
     //* if its going in root directory, just put new directory entry in directory and file in next open block?
     // create new directory entry 
-    struct dir_entry_t *directory_entry = malloc(sizeof(struct dir_entry_t));
+    //! struct dir_entry_t *directory_entry = malloc(sizeof(struct dir_entry_t));
 
     //* if its not going in root directory, check if subdirectory already exists by browsing root directory entries?
         // if it does exist, create new directory entry for this subdirectory for the file 
