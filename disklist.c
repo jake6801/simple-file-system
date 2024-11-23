@@ -38,7 +38,7 @@ struct __attribute__((__packed__)) dir_entry_t {
     __uint8_t unused[6];
 };
 
-void print_directory_info(int file_descriptor, struct superblock_t superblock, int start_block, int block_count) {    
+void print_directory_info(int file_descriptor, char *list_location, struct superblock_t superblock, int start_block, int block_count) {    
     int directory_size = block_count * superblock.block_size;
     struct dir_entry_t *directory = malloc(directory_size);
     lseek(file_descriptor, start_block * superblock.block_size, SEEK_SET);
@@ -55,7 +55,7 @@ void print_directory_info(int file_descriptor, struct superblock_t superblock, i
             type = 'F'; // Regular file
         } else if (directory_entry->status == 0x05) {
             type = 'D'; // Directory
-            continue;
+            // continue;
         } else {
             type = '?'; // Unknown
             printf("Uknown file type\n");
@@ -67,16 +67,51 @@ void print_directory_info(int file_descriptor, struct superblock_t superblock, i
 
         // Print entry details
         printf("%c %10d %30s ", type, file_size, directory_entry->filename);
-        printf("%d/%d/%d %.2d:%.2d:%.2d", directory_entry->modify_time.year, directory_entry->modify_time.month, directory_entry->modify_time.day, directory_entry->modify_time.hour, directory_entry->modify_time.minute, directory_entry->modify_time.second);
+        printf("%d/%d/%d %.2d:%.2d:%.2d", ntohs(directory_entry->create_time.year), directory_entry->modify_time.month, directory_entry->modify_time.day, directory_entry->modify_time.hour, directory_entry->modify_time.minute, directory_entry->modify_time.second);
         printf("\n");
     }
     free(directory);
 }
 
+void find_dir(int file_descriptor, char *list_location, struct superblock_t superblock) {
+    int current_block = superblock.root_dir_start_block;
+    int current_block_count = superblock.root_dir_block_count;
+    char *token;
+    token = strtok(list_location, "/");
+    while(token!=NULL) {
+        int directory_size = current_block_count * superblock.block_size;
+        struct dir_entry_t *directory = malloc(directory_size);
+
+        lseek(file_descriptor, current_block * superblock.block_size, SEEK_SET);
+        read(file_descriptor, directory, directory_size);
+
+        int dir_found = 0;
+        int num_entries = directory_size / sizeof(struct dir_entry_t);
+        for (int i = 0; i < num_entries; i++) {
+            struct dir_entry_t *entry = &directory[i];
+            if(entry->status == 0x05 && strcmp((char *)entry->filename, token) == 0) {
+                current_block = ntohl(entry->starting_block);
+                current_block_count = ntohl(entry->block_count);
+                dir_found = 1;
+                break;
+            }
+        }
+        free(directory);
+        if (!dir_found) {
+            printf("No matching directory found.\n"); //! what should be the output for this 
+            return;
+        }
+        token = strtok(NULL, "/");
+    }
+    print_directory_info(file_descriptor, list_location, superblock, current_block, current_block_count);
+}
+
 int main(int argc, char *argv[]) {    
+    char *fs_file_name = argv[1];
+    char *list_location = argv[2];
     // read first 30 bytes into superblock struct
     struct superblock_t superblock = {0}; //TODO dynamically allocate memory for this?
-    int file_descriptor = open(argv[1], O_RDONLY); //? why do i need this O_RDONLY
+    int file_descriptor = open(fs_file_name, O_RDONLY); //? why do i need this O_RDONLY
     read(file_descriptor, &superblock, sizeof(superblock));    
 
     // convert all ints into big endian 
@@ -91,7 +126,7 @@ int main(int argc, char *argv[]) {
     // printf("Block size: %d\nBlock count: %d\nFAT starts: %d\nFAT blocks: %d\nRoot directory start: %d\nRoot directory blocks: %d\n\n", superblock.block_size, superblock.file_system_block_count, superblock.fat_start_block, superblock.fat_block_count, superblock.root_dir_start_block, superblock.root_dir_block_count);
 
     // read in groups of 64 bytes to get this information? 
-    print_directory_info(file_descriptor, superblock, superblock.root_dir_start_block, superblock.root_dir_block_count);
+    find_dir(file_descriptor, list_location, superblock);
 
     close(file_descriptor);
     
