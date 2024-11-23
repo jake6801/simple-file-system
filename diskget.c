@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
     void* fs_address = mmap(NULL, fs_buffer.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fs_fd, 0);
 
     //TODO open the file to copy into
-    FILE *get_file = fopen(get_file_name, "ab");
+    FILE *get_file = fopen(get_file_name, "wb");
     
     struct superblock_t *superblock = (struct superblock_t *)fs_address;
     superblock->block_size = ntohs(superblock->block_size);
