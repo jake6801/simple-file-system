@@ -89,9 +89,10 @@ int main(int argc, char *argv[]) {
     char *prev_token = NULL;
     // have a pointer for the location to search through, first being root, then update this as we dive deeper into subdirs
     void* put_file_dir_address = (uint8_t*)fs_address + superblock->root_dir_start_block * superblock->block_size;
+    printf("root dir address: %p\n", put_file_dir_address);
     struct dir_entry_t* dir_entry = (struct dir_entry_t*)put_file_dir_address;
     char *new_filename;
-    while (token != NULL) { //! might have to do something for if first token is actually null because it comes before the delimeter / 
+    while (token != NULL) {  
         char *next_token = strtok(NULL, "/");
         bool found_dir = false;        
         printf("curr token: %s\n", token);
@@ -104,11 +105,12 @@ int main(int argc, char *argv[]) {
         }
         // if next_token != NULL then this is a subdir so search through root 
         for (int i = 0; i < superblock->root_dir_block_count * superblock->block_size / sizeof(struct dir_entry_t); i++) { //! change block count based on directory were searching through 
-            printf("Searching for subdir\n");
+            printf("Searching for %s\n", token);
             // if the subdir exists
             if (dir_entry[i].status == 0x05 && strcmp((char *)dir_entry[i].filename, token) == 0) {
-                printf("Found subdir\n");
-                put_file_dir_address = (uint8_t*)fs_address + dir_entry[i].starting_block * superblock->block_size;
+                printf("Found %s at block %d\n", dir_entry[i].filename, ntohl(dir_entry[i].starting_block));
+                put_file_dir_address = (uint8_t*)fs_address + ntohl(dir_entry[i].starting_block) * superblock->block_size;
+                printf("updating address to %p\n", put_file_dir_address);
                 dir_entry = (struct dir_entry_t*)put_file_dir_address;
                 found_dir = true;
                 break;
@@ -167,6 +169,7 @@ int main(int argc, char *argv[]) {
             for (int i = 0; i < superblock->root_dir_block_count * superblock->block_size / sizeof(struct dir_entry_t); i++) {
                 if (dir_entry[i].status == 0x00) {
                     printf("Found free block in directory at %d and inserting directory entry\n", i);
+                    printf("dir_entry[i] is at %p\n", dir_entry + i*64);
                     dir_entry_found = 1;
                     dir_entry[i].status = 0x05;
                     dir_entry[i].starting_block = htonl(first_free_block);
@@ -183,8 +186,8 @@ int main(int argc, char *argv[]) {
                     dir_entry[i].filename[30] = '\0';
                     memset(dir_entry[i].unused, 0xFF, sizeof(dir_entry[i].unused));
                     
-                    put_file_dir_address = (uint8_t*)fs_address + first_free_block * superblock->block_size;
-                    dir_entry = (struct dir_entry_t*)put_file_dir_address;
+                    // put_file_dir_address = (uint8_t*)fs_address + first_free_block * superblock->block_size;
+                    // dir_entry = (struct dir_entry_t*)put_file_dir_address;
                     break;
                 }
             }
@@ -193,8 +196,13 @@ int main(int argc, char *argv[]) {
                 printf("Current directory is full. Cannot create a new file entry.\n");
                 return -1;
             }
-        }
 
+            put_file_dir_address = (uint8_t*)fs_address + first_free_block * superblock->block_size;
+            printf("updating address to %p\n", put_file_dir_address);
+            printf("resetting address to block %d\n", first_free_block);
+            dir_entry = (struct dir_entry_t*)put_file_dir_address;
+        }
+        
         prev_token = token;
         token = next_token;
     }
