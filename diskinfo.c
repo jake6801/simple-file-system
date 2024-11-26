@@ -56,11 +56,6 @@ int main(int argc, char *argv[]) {
     memcpy(&fssize, address+10, 4);
     fssize = ntohl(fssize);
 
-    //! this is how I was doing it before, now doing it the way TA said to do it in example code 
-    // struct superblock_t superblock = {0}; //TODO dynamically allocate memory for this?
-    // int fd = open(argv[1], O_RDWR); 
-    // read(fd, &superblock, sizeof(superblock));    
-
     // convert all ints into big endian
     superblock->block_size = ntohs(superblock->block_size);
     superblock->file_system_block_count = ntohl(superblock->file_system_block_count);
@@ -97,7 +92,6 @@ int main(int argc, char *argv[]) {
         else { // 0x00000002 - 0xFFFFFF00 means allocated blocks as part of files and 0xFFFFFFFF means its the last block in a file so count both as allocated 
             allocated_blocks++;
         }
-        //? do i need something for recognizing the last block in a file? (when fat_entry == 0xFFFFFFFF)?
     }
     
     // free dynamically allocated memory for FAT and close the file 

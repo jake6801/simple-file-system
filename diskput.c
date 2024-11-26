@@ -131,10 +131,8 @@ int main(int argc, char *argv[]) {
                 if (fat_table[i] == 0x00000000) {
                     if (free_block_count == 0) {
                         first_free_block = i;
-                        printf("First free block = %d\n", first_free_block);
                     }
                     free_block_count++;
-                    printf("next free block = %d\n", i);
 
                     if (free_block_count == num_blocks_needed) {
                         break;
@@ -153,31 +151,28 @@ int main(int argc, char *argv[]) {
             int free_blocks[num_blocks_needed];
             for (int i = 0; i < num_blocks_needed; i++) {
                 free_blocks[i] = first_free_block + i;
-                printf("free block: %d\n", first_free_block + i);
             }
 
             // allocate the free blocks needed in the fat
             for (int i = 0; i < num_blocks_needed - 1; i++) {
-                fat_table[free_blocks[i]] = htonl(free_blocks[i+1]); //! do i assign this or do i set them all to reserved - 0x00000001?
-                printf("assigning fat table at block %d the value %x\n", free_blocks[i], htonl(free_blocks[i]));
+                fat_table[free_blocks[i]] = htonl(free_blocks[i+1]); 
             }
-            fat_table[free_blocks[num_blocks_needed - 1]] = htonl(0xFFFFFFFF); //! do you still do this for directories?
-            printf("assigning fat table at block %d the value %x\n", free_blocks[num_blocks_needed - 1], htonl(0xFFFFFFFF));
+            fat_table[free_blocks[num_blocks_needed - 1]] = htonl(0xFFFFFFFF); 
             
             // create directory entry in current directory for the new directory and update the put_file_dir_address and dir_entry to this new location
             int dir_entry_found = 0;
             for (int i = 0; i < superblock->root_dir_block_count * superblock->block_size / sizeof(struct dir_entry_t); i++) {
                 if (dir_entry[i].status == 0x00) {
-                    printf("Found free block in directory at %d and inserting directory entry\n", i);
-                    printf("dir_entry[i] is at %p\n", dir_entry + i*64);
                     dir_entry_found = 1;
                     dir_entry[i].status = 0x05;
                     dir_entry[i].starting_block = htonl(first_free_block);
                     dir_entry[i].block_count = htonl(num_blocks_needed);
                     dir_entry[i].size = htonl(0);
                     
-                    //TODO fix this to be actual time stamps 
-                    struct dir_entry_timedate_t now = {2024, 11, 19, 12, 0, 1};
+                    time_t curr_time = time(NULL);
+                    struct tm *time_struct = localtime(&curr_time);
+                    uint16_t year = (uint16_t)(1900 + time_struct->tm_year);
+                    struct dir_entry_timedate_t now = {ntohs(year), time_struct->tm_mon+1, time_struct->tm_mday, time_struct->tm_hour, time_struct->tm_min, time_struct->tm_sec};
                     dir_entry[i].create_time = now;
                     dir_entry[i].modify_time = now;
 
@@ -276,8 +271,10 @@ int main(int argc, char *argv[]) {
             dir_entry[i].block_count = htonl(num_blocks_needed);
             dir_entry[i].size = htonl(put_file_buffer.st_size);
             
-            //TODO fix this to be actual time stamps 
-            struct dir_entry_timedate_t now = {2024, 11, 19, 12, 0, 1};
+            time_t curr_time = time(NULL);
+            struct tm *time_struct = localtime(&curr_time);
+            uint16_t year = (uint16_t)(1900 + time_struct->tm_year);
+            struct dir_entry_timedate_t now = {ntohs(year), time_struct->tm_mon+1, time_struct->tm_mday, time_struct->tm_hour, time_struct->tm_min, time_struct->tm_sec};
             dir_entry[i].create_time = now;
             dir_entry[i].modify_time = now;
 
@@ -308,33 +305,6 @@ int main(int argc, char *argv[]) {
     close(put_fd);
     munmap(fs_address, fs_buffer.st_size);
     close(fs_fd);
-
-
-
-    
-    // check if specified directory exists in FAT image 
-    //TODO how the fuck do I do this when I dont even know how to see one with multiple directories and files 
-    // check through the root directory entries to see if the directory exists
-    //     if so go to this directory and find the next available block
-    //     else create this directory by updating root directory with new entry for this directory in next available block and then put file in this new directory by creating entry and putting it in next available block?
-
-    //* if its going in root directory, just put new directory entry in directory and file in next open block?
-    // create new directory entry 
-    //! struct dir_entry_t *directory_entry = malloc(sizeof(struct dir_entry_t));
-
-    //* if its not going in root directory, check if subdirectory already exists by browsing root directory entries?
-        // if it does exist, create new directory entry for this subdirectory for the file 
-        // else, create new directory entry for root directory, then create new directory entry for this subdirectory for the file 
-
-    
-
-    // check if disk has enough space to store the file 
-
-    // create a new directory entry in the given path 
-
-    // go through the FAT entries to find unused sectors in disk and copy the file content to these sectors 
-
-    // update the first logical cluster number and file size field of directory entry we just created and update the FAT entries we used 
 
     return 0;
 }
