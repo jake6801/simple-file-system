@@ -77,7 +77,6 @@ int main(int argc, char *argv[]) {
         
         // in correct directory, look for file 
         if (next_token == NULL) { 
-            printf("in correct dir, looking for file %s\n", token);
             for (int i = 0; i < superblock->block_size * superblock->root_dir_block_count / sizeof(struct dir_entry_t); i++) {
                 if (dir_entry[i].status == 0x03 && strcmp((char *)dir_entry[i].filename, token) == 0) {
                     FILE *get_file = fopen(get_file_name, "wb");
@@ -92,11 +91,15 @@ int main(int argc, char *argv[]) {
                     uint32_t total_bytes_to_copy = file_size;
                     for (uint32_t block = 0; block < block_count && total_bytes_to_copy > 0; block++) {
                         void *block_address = (uint8_t *)get_file_dir_address + block * superblock->block_size;                        
-                        size_t bytes_to_copy = (total_bytes_to_copy < superblock->block_size) ? total_bytes_to_copy : superblock->block_size; //! change this to if statement
+                        size_t bytes_to_copy;
+                        if (total_bytes_to_copy < superblock->block_size) {
+                            bytes_to_copy = total_bytes_to_copy;
+                        } else {
+                            bytes_to_copy = superblock->block_size;
+                        }
                         fwrite(block_address, 1, bytes_to_copy, get_file);
                         total_bytes_to_copy -= bytes_to_copy;
                     }
-                    printf("File %s copied successfully\n", get_file_name);
                     fclose(get_file);
                     close(fs_fd);
                     munmap(fs_address, fs_buffer.st_size);
@@ -114,11 +117,9 @@ int main(int argc, char *argv[]) {
         }
         // look for correct directory 
         else {
-            printf("looking for directory %s\n", token);
             for (int i = 0; i < superblock->root_dir_block_count * superblock->block_size / sizeof(struct dir_entry_t); i++) {
                 // if found, update address pointer and break out of for loop 
                 if (dir_entry[i].status == 0x05 && strcmp((char *)dir_entry[i].filename, token) == 0) {
-                    printf("Found directory %s at block %d\n", dir_entry[i].filename, ntohl(dir_entry[i].starting_block));
                     get_file_dir_address = (uint8_t*)fs_address + ntohl(dir_entry[i].starting_block) * superblock->block_size;                    
                     dir_entry = (struct dir_entry_t*)get_file_dir_address;
                     found_dir = true;

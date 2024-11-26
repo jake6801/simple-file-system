@@ -119,8 +119,8 @@ int main(int argc, char *argv[]) {
     char *fs_file_name = argv[1];
     char *list_location = argv[2];
     // read first 30 bytes into superblock struct
-    struct superblock_t superblock = {0}; //TODO dynamically allocate memory for this?
-    int file_descriptor = open(fs_file_name, O_RDONLY); //? why do i need this O_RDONLY
+    struct superblock_t superblock = {0}; 
+    int file_descriptor = open(fs_file_name, O_RDONLY); 
     read(file_descriptor, &superblock, sizeof(superblock));    
 
     // convert all ints into big endian 

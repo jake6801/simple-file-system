@@ -78,39 +78,26 @@ int main(int argc, char *argv[]) {
     superblock->root_dir_start_block = ntohl(superblock->root_dir_start_block);
     superblock->root_dir_block_count = ntohl(superblock->root_dir_block_count);
 
-
-    // check root directory for reference to subdirectory 
-        // if it doesnt exist then create it and reserve 8 blocks for it //! how many should we be reserving for subdirectories?
-        // if it does create the directory entry in here instead 
-    
-    // breakup location into directories - ex. /subdir/subdir2/foo3.txt 
-        // tokenize it delimited by /, if its only one token then this is the file name and going in root dir, if its multiple 
     char *token = strtok(put_location, "/");
     char *prev_token = NULL;
-    // have a pointer for the location to search through, first being root, then update this as we dive deeper into subdirs
+
     void* put_file_dir_address = (uint8_t*)fs_address + superblock->root_dir_start_block * superblock->block_size;
-    printf("root dir address: %p\n", put_file_dir_address);
     struct dir_entry_t* dir_entry = (struct dir_entry_t*)put_file_dir_address;
     char *new_filename;
     while (token != NULL) {  
         char *next_token = strtok(NULL, "/");
         bool found_dir = false;        
-        printf("curr token: %s\n", token);
         // if next_token == NULL then file is getting put in this directory under the name token
         if (next_token == NULL) {    
-            printf("In correct dir, getting new file name\n");        
             new_filename = token;
-            found_dir = true; // do i need this if im already breaking out of the while loop?
+            found_dir = true; 
             break;
         }
-        // if next_token != NULL then this is a subdir so search through root 
-        for (int i = 0; i < superblock->root_dir_block_count * superblock->block_size / sizeof(struct dir_entry_t); i++) { //! change block count based on directory were searching through 
-            printf("Searching for %s\n", token);
+        // if next_token != NULL then this is a subdir so search through curr dir 
+        for (int i = 0; i < superblock->root_dir_block_count * superblock->block_size / sizeof(struct dir_entry_t); i++) { 
             // if the subdir exists
             if (dir_entry[i].status == 0x05 && strcmp((char *)dir_entry[i].filename, token) == 0) {
-                printf("Found %s at block %d\n", dir_entry[i].filename, ntohl(dir_entry[i].starting_block));
                 put_file_dir_address = (uint8_t*)fs_address + ntohl(dir_entry[i].starting_block) * superblock->block_size;
-                printf("updating address to %p\n", put_file_dir_address);
                 dir_entry = (struct dir_entry_t*)put_file_dir_address;
                 found_dir = true;
                 break;
@@ -118,9 +105,7 @@ int main(int argc, char *argv[]) {
         }
         // subdir doesnt exist, create it 
         if (!found_dir) {
-            printf("Did not find subdir, creating new subdir\n");
-            // search through fat table for 8?? free blocks and reserve them in the fat table
-            //! should create a function that does this so I can just call it in here and later rather than pasting same code twice 
+            // search through fat table for 8 free blocks and reserve them in the fat table
             int num_blocks_needed = 8;
             int fat_size = superblock->block_size * superblock->fat_block_count;
             uint32_t* fat_table = (uint32_t*)((uint8_t*)fs_address + superblock->fat_start_block * superblock->block_size);
@@ -176,13 +161,10 @@ int main(int argc, char *argv[]) {
                     dir_entry[i].create_time = now;
                     dir_entry[i].modify_time = now;
 
-
                     strncpy((char*)dir_entry[i].filename, token, 31);
                     dir_entry[i].filename[30] = '\0';
                     memset(dir_entry[i].unused, 0xFF, sizeof(dir_entry[i].unused));
                     
-                    // put_file_dir_address = (uint8_t*)fs_address + first_free_block * superblock->block_size;
-                    // dir_entry = (struct dir_entry_t*)put_file_dir_address;
                     break;
                 }
             }
@@ -193,8 +175,6 @@ int main(int argc, char *argv[]) {
             }
 
             put_file_dir_address = (uint8_t*)fs_address + first_free_block * superblock->block_size;
-            printf("updating address to %p\n", put_file_dir_address);
-            printf("resetting address to block %d\n", first_free_block);
             dir_entry = (struct dir_entry_t*)put_file_dir_address;
         }
         
@@ -204,10 +184,6 @@ int main(int argc, char *argv[]) {
 
     // figure out how many blocks I need for the file 
     int num_blocks_needed = (put_file_buffer.st_size + superblock->block_size - 1) / superblock->block_size; 
-
-    // find free blocks in the fat
-        // read groups of 8 bits to find the first free blocks that is enough for the file 
-            // allocate the blocks, then write into them with the file, then write directory entry in root 
     
     // assign fat_table pointer to point to its mapped space in memory 
     int fat_size = superblock->block_size * superblock->fat_block_count;
@@ -257,9 +233,6 @@ int main(int argc, char *argv[]) {
         remaining_bytes -= bytes_to_write;
     }
 
-    // // assign root directory pointer to point to its mapped space in memory
-    // void* root_dir_address = (uint8_t*)fs_address + superblock->root_dir_start_block * superblock->block_size;
-    // struct dir_entry_t* dir_entry = (struct dir_entry_t*)root_dir_address;
     int dir_entry_found = 0;
     
     // add directory entries for the new file 
@@ -308,4 +281,5 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+
 
